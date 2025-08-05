@@ -8,13 +8,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@solana/spl-token": "latest",
     "@solana/wallet-adapter-base": "latest",
     "@solana/wallet-adapter-react": "latest",
     "@solana/wallet-adapter-react-ui": "latest",
     "@solana/wallet-adapter-wallets": "latest",
     "@solana/web3.js": "latest",
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react": "latest",
+    "react-dom": "latest"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "latest",
