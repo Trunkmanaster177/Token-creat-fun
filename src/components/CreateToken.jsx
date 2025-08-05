@@ -1,51 +1,71 @@
-import React, { useState } from 'react';
-import { Connection, clusterApiUrl } from '@solana/web3.js';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { createMint } from '@solana/spl-token';
+import React, { useState } from "react";
+import { Connection, Keypair, PublicKey, clusterApiUrl } from "@solana/web3.js";
+import { createMint, getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 const CreateToken = () => {
-  const wallet = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const [tokenAddress, setTokenAddress] = useState(null);
   const [loading, setLoading] = useState(false);
-  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
-  const handleCreateToken = async () => {
-    if (!wallet.connected) {
-      alert("Please connect your wallet first.");
+  const createToken = async () => {
+    if (!publicKey || !signTransaction) {
+      alert("Connect your wallet first.");
       return;
     }
 
-    setLoading(true);
     try {
+      setLoading(true);
+
+      const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+
+      const mintAuthority = Keypair.generate();
+
       const mint = await createMint(
         connection,
-        wallet, // payer
-        wallet.publicKey,
-        wallet.publicKey,
-        9 // decimals
+        mintAuthority,
+        mintAuthority.publicKey,
+        null,
+        9
       );
+
+      const tokenAccount = await getOrCreateAssociatedTokenAccount(
+        connection,
+        mintAuthority,
+        mint,
+        mintAuthority.publicKey
+      );
+
+      await mintTo(
+        connection,
+        mintAuthority,
+        mint,
+        tokenAccount.address,
+        mintAuthority,
+        1000000000
+      );
+
       setTokenAddress(mint.toBase58());
+      alert("Token created: " + mint.toBase58());
     } catch (err) {
-      console.error("Token creation failed:", err);
-      alert("Error creating token. Check console.");
+      console.error(err);
+      alert("Error creating token");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
     <div>
-      <button
-        onClick={handleCreateToken}
-        disabled={loading}
-        style={{ padding: '10px 20px', background: 'blue', color: '#fff' }}
-      >
-        {loading ? "Creating Token..." : "Create Token"}
+      <button onClick={createToken} disabled={loading}>
+        {loading ? "Creating..." : "Create Token"}
       </button>
-
       {tokenAddress && (
-        <p style={{ marginTop: '1rem' }}>
-          ✅ Token Created! <br />
-          <strong>{tokenAddress}</strong>
+        <p>
+          🎉 Token Mint Address: <br />
+          <a href={`https://explorer.solana.com/address/${tokenAddress}?cluster=devnet`} target="_blank">
+            {tokenAddress}
+          </a>
         </p>
       )}
     </div>
