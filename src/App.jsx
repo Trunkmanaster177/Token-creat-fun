@@ -1,82 +1,115 @@
-import React, { useCallback, useState } from "react";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { createMint, getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
-import { PublicKey } from "@solana/web3.js";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  ConnectionProvider,
+  WalletProvider,
+} from "@solana/wallet-adapter-react";
+import {
+  WalletModalProvider,
+  WalletMultiButton,
+} from "@solana/wallet-adapter-react-ui";
+import {
+  PhantomWalletAdapter,
+} from "@solana/wallet-adapter-wallets";
 
-export default function App() {
-  const { connection } = useConnection();
-  const { publicKey, sendTransaction, signTransaction } = useWallet();
-  const [tokenAddress, setTokenAddress] = useState(null);
+import { clusterApiUrl, Keypair, PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
+
+import "@solana/wallet-adapter-react-ui/styles.css";
+
+const CreateTokenApp = () => {
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("");
 
-  const handleCreateToken = useCallback(async () => {
+  const network = "devnet";
+  const endpoint = useMemo(() => clusterApiUrl(network), []);
+  const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
+
+  const { publicKey, sendTransaction } = useWallet();
+
+  const handleCreateToken = async () => {
     if (!publicKey) {
-      alert("Connect your wallet first.");
+      alert("Connect your Phantom wallet first");
       return;
     }
 
     try {
       setLoading(true);
+      setStatus("Creating token...");
 
-      const mint = await createMint(
-        connection,
-        await signTransaction({}),
-        publicKey,
-        null,
-        9 // decimals
+      const mint = Keypair.generate();
+      const connection = new window.solanaWeb3.Connection(endpoint, "confirmed");
+
+      const lamportsForRentExemption = await connection.getMinimumBalanceForRentExemption(
+        window.solanaWeb3.MINT_SIZE
       );
 
-      const tokenAccount = await getOrCreateAssociatedTokenAccount(
-        connection,
-        await signTransaction({}),
-        mint,
-        publicKey
+      const transaction = new Transaction().add(
+        SystemProgram.createAccount({
+          fromPubkey: publicKey,
+          newAccountPubkey: mint.publicKey,
+          space: window.solanaWeb3.MINT_SIZE,
+          lamports: lamportsForRentExemption,
+          programId: window.solanaWeb3.TOKEN_PROGRAM_ID,
+        })
       );
 
-      await mintTo(
-        connection,
-        await signTransaction({}),
-        mint,
-        tokenAccount.address,
-        publicKey,
-        1000000000 // 1,000 tokens (with 9 decimals)
-      );
+      const signature = await sendTransaction(transaction, connection);
+      await connection.confirmTransaction(signature, "confirmed");
 
-      setTokenAddress(mint.toBase58());
-    } catch (err) {
-      alert("Error: " + err.message);
+      setStatus(`Token created! Mint Address: ${mint.publicKey.toBase58()}`);
+    } catch (error) {
+      console.error(error);
+      setStatus("Error creating token");
     } finally {
       setLoading(false);
     }
-  }, [connection, publicKey, sendTransaction, signTransaction]);
+  };
 
   return (
-    <div style={{ textAlign: "center", marginTop: "50px" }}>
-      <h1>Create SPL Token</h1>
-      <WalletMultiButton />
-      <br /><br />
-      <button
-        onClick={handleCreateToken}
-        disabled={!publicKey || loading}
-        style={{
-          padding: "10px 20px",
-          backgroundColor: "#4b0082",
-          color: "white",
-          border: "none",
-          borderRadius: "8px",
-          cursor: "pointer"
-        }}
-      >
-        {loading ? "Creating..." : "Create Token"}
-      </button>
-
-      {tokenAddress && (
-        <div style={{ marginTop: "20px" }}>
-          <strong>Token Mint Address:</strong>
-          <p>{tokenAddress}</p>
-        </div>
-      )}
-    </div>
+    <ConnectionProvider endpoint={endpoint}>
+      <WalletProvider wallets={wallets} autoConnect>
+        <WalletModalProvider>
+          <div style={styles.container}>
+            <h1 style={styles.title}>Solana Token Creator</h1>
+            <WalletMultiButton />
+            <button style={styles.button} onClick={handleCreateToken} disabled={loading}>
+              {loading ? "Processing..." : "Create SPL Token"}
+            </button>
+            <p style={styles.status}>{status}</p>
+          </div>
+        </WalletModalProvider>
+      </WalletProvider>
+    </ConnectionProvider>
   );
-        }
+};
+
+export default CreateTokenApp;
+
+const styles = {
+  container: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    marginTop: "80px",
+    fontFamily: "Arial",
+  },
+  title: {
+    fontSize: "28px",
+    fontWeight: "bold",
+    marginBottom: "20px",
+  },
+  button: {
+    marginTop: "20px",
+    padding: "10px 20px",
+    fontSize: "16px",
+    borderRadius: "5px",
+    background: "purple",
+    color: "white",
+    border: "none",
+    cursor: "pointer",
+  },
+  status: {
+    marginTop: "20px",
+    maxWidth: "90%",
+    textAlign: "center",
+  },
+};
