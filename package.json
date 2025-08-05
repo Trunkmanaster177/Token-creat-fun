@@ -13,8 +13,8 @@
     "@solana/wallet-adapter-react-ui": "latest",
     "@solana/wallet-adapter-wallets": "latest",
     "@solana/web3.js": "latest",
-    "react": "latest",
-    "react-dom": "latest"
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "latest",
